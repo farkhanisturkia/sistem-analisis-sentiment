@@ -9,13 +9,13 @@ use App\Models\Comment;
 use App\Models\NaiveBayes;
 use Illuminate\Support\Facades\Cache;
 
-#[Signature('nb:train')]
-#[Description('Train Naive Bayes from comments table into naive_bayes table')]
-class TrainNaiveBayes extends Command
+#[Signature('nb:update')]
+#[Description('Update Naive Bayes from comments table into naive_bayes table')]
+class UpdateNaiveBayes extends Command
 {
     public function handle(): int
     {
-        $this->info('🚀 Training Naive Bayes...');
+        $this->info('🚀 Update Naive Bayes...');
 
         // kosongkan data training lama
         NaiveBayes::truncate();
@@ -40,7 +40,7 @@ class TrainNaiveBayes extends Command
         Cache::forget('naive_bayes_model');
 
         $this->newLine(2);
-        $this->info('✅ Training selesai!');
+        $this->info('✅ Update selesai!');
         $this->info('Total data: ' . $comments->count());
 
         return self::SUCCESS;
