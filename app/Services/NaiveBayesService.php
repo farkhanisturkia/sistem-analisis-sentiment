@@ -2,7 +2,8 @@
 
 namespace App\Services;
 
-use App\Models\Comment;
+use App\Models\NaiveBayes;
+use Illuminate\Support\Facades\Cache;
 
 class NaiveBayesService
 {
@@ -15,7 +16,15 @@ class NaiveBayesService
 
     public function predict($text)
     {
-        $this->train();
+        $model = Cache::remember('naive_bayes_model', 3600, function () {
+            return $this->train();
+        });
+
+        // load model
+        $this->vocab = $model['vocab'];
+        $this->wordCount = $model['wordCount'];
+        $this->classCount = $model['classCount'];
+        $this->totalWordsPerClass = $model['totalWordsPerClass'];
 
         $words = $this->preprocess($text);
         $vocabSize = count($this->vocab);
@@ -25,14 +34,12 @@ class NaiveBayesService
 
         foreach ($this->classes as $class) {
 
-            // prior
             $prior = $this->classCount[$class] / ($totalDocs ?: 1);
             $score = log($prior ?: 1);
 
             foreach ($words as $word) {
                 $wordFreq = $this->wordCount[$class][$word] ?? 0;
 
-                // Laplace smoothing
                 $prob = ($wordFreq + 1) /
                         (($this->totalWordsPerClass[$class] ?? 0) + $vocabSize);
 
@@ -42,7 +49,6 @@ class NaiveBayesService
             $scores[$class] = $score;
         }
 
-        // aturan netral
         if (abs(($scores['positif'] ?? 0) - ($scores['negatif'] ?? 0)) < 0.5) {
             return [
                 'label' => 'netral',
@@ -60,36 +66,46 @@ class NaiveBayesService
 
     protected function train()
     {
-        $comments = Comment::all();
+        $data = NaiveBayes::all();
+
+        $vocab = [];
+        $wordCount = [];
+        $classCount = [];
+        $totalWordsPerClass = [];
 
         foreach ($this->classes as $class) {
-            $this->wordCount[$class] = [];
-            $this->classCount[$class] = 0;
-            $this->totalWordsPerClass[$class] = 0;
+            $wordCount[$class] = [];
+            $classCount[$class] = 0;
+            $totalWordsPerClass[$class] = 0;
         }
 
-        foreach ($comments as $row) {
+        foreach ($data as $row) {
             $label = $row->label;
-            $this->classCount[$label]++;
+            $classCount[$label]++;
 
             $words = $this->preprocess($row->comment);
 
             foreach ($words as $word) {
-                $this->vocab[$word] = true;
+                $vocab[$word] = true;
 
-                $this->wordCount[$label][$word] =
-                    ($this->wordCount[$label][$word] ?? 0) + 1;
+                $wordCount[$label][$word] =
+                    ($wordCount[$label][$word] ?? 0) + 1;
 
-                $this->totalWordsPerClass[$label]++;
+                $totalWordsPerClass[$label]++;
             }
         }
+
+        return [
+            'vocab' => $vocab,
+            'wordCount' => $wordCount,
+            'classCount' => $classCount,
+            'totalWordsPerClass' => $totalWordsPerClass
+        ];
     }
 
     protected function preprocess($text)
     {
         $text = strtolower($text);
-
-        // hapus simbol
         $text = preg_replace('/[^a-z0-9\s]/', '', $text);
 
         $words = explode(' ', $text);
