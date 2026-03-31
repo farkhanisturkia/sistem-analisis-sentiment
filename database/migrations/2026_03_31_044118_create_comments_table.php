@@ -23,6 +23,7 @@ return new class extends Migration
                   ->cascadeOnDelete();
             
             $table->text('comment');
+            $table->enum('label', ['positif', 'netral', 'negatif']);
             $table->unsignedTinyInteger('rating')->nullable();
             $table->timestamps();
         });
